@@ -1,0 +1,59 @@
+{
+    "elements": [
+		{
+			"type": "CheckBox",
+			"name": "Active",
+			"caption": "Senden & Timer aktiv"
+		},
+        {
+            "type": "Label",
+            "caption": "Dieses Modul benötigt eine Verbindung zum KNX Konfigurator (I/O Instanz)."
+        },
+        {
+            "type": "ValidationTextBox",
+            "name": "GA_Time",
+            "caption": "Uhrzeit Gruppenadresse Format 8/0/0 (DPT 10.001)",
+            "validate": "^\\d{1,2}/\\d{1,2}/\\d{1,2}$",
+            "width": "250px"
+        },
+        {
+            "type": "ValidationTextBox",
+            "name": "GA_Date",
+            "caption": "Datum Gruppenadresse Format 8/0/0 (DPT 11.001)",
+            "validate": "^\\d{1,2}/\\d{1,2}/\\d{1,2}$",
+            "width": "250px"
+        },
+        {
+            "type": "Label",
+            "caption": "Sendezeiten definieren (z.B. 00:00:00, 12:00:00)"
+        },
+        {
+            "type": "List",
+            "name": "SendTimes",
+			"caption": "Liste Sendezeiten",
+            "rowCount": 5,
+            "add": {
+				"Time": ""
+			},
+            "delete": true,
+            "columns": [
+                {
+                    "caption": "Sendezeit (HH:mm:ss)",
+                    "name": "Time",
+                    "width": "200px",
+					"add": "",
+					"edit": {
+						"type": "SelectTime"
+					}
+                }
+            ]
+        }
+    ],
+    "actions": [
+        {
+            "type": "Button",
+            "caption": "Zeit/Datum jetzt manuell senden",
+            "onClick": "KSZT_SendKNXTimeAndDate($id);"
+        }
+    ]
+}

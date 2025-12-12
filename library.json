@@ -1,0 +1,12 @@
+{
+    "id": "{55518B90-B72E-28E0-7D0D-44F98D726B7E}",
+    "name": "KNXSystemZeitgeber",
+    "author": "BugForgeNerd",
+    "url": "https://github.com/BugForgeNerd/KNXSystemZeitgeber",
+    "compatibility": {
+        "version": "7.1"
+    },
+    "version": "0.1",
+    "build": 0,
+    "date": 1765468648
+}

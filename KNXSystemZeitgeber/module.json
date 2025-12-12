@@ -1,0 +1,18 @@
+{
+    "id": "{533F9040-987C-24D7-2275-C12A0111D4C7}",
+    "name": "KNXSystemZeitgeber",
+    "type": 3,
+    "vendor": "BugForgeNerd",
+    "aliases": [
+        "KNXsystime"
+    ],
+    "parentRequirements": [
+    "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}"
+    ],
+    "childRequirements": [],
+    "implemented": [
+    "{8A4D3B17-F8D7-4905-877F-9E69CEC3D579}"
+    ],
+    "prefix": "KSZT",
+    "url": "https://github.com/BugForgeNerd/KNXSystemZeitgeber"
+}

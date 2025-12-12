@@ -1,0 +1,37 @@
+{
+    "translations": {
+        "de": {
+            "Active": "Senden & Timer aktiv",
+            "KNX_CONNECTOR_NOTICE": "Dieses Modul benötigt eine Verbindung zum KNX Gateway (Splitter Instanz).",
+            "GA_Time": "Uhrzeit Gruppenadresse Format 8/0/0 (DPT 10.001)",
+            "GA_Date": "Datum Gruppenadresse Format 8/0/0 (DPT 11.001)",
+            "SEND_TIMES_NOTICE": "Sendezeiten definieren (z.B. 00:00:00, 12:00:00)",
+            "SendTimes": "Liste Sendezeiten",
+            "TIME_COLUMN": "Sendezeit (HH:mm:ss)",
+            "SendNow": "Zeit/Datum jetzt manuell senden",
+            "NoTimes": "Keine gültigen Zeiten. Timer deaktiviert.",
+            "LICENSE_NOTICE": "Diese Software steht unter der Apache-2.0-Lizenz und ist sowohl privat als auch kommerziell kostenlos nutzbar. Sie kann von dir genutzt werden, ohne dass Lizenzgebühren anfallen. Jegliche Haftung für Schäden ist ausgeschlossen. Weitere Informationen zum Modul und seiner Funktionsweise finden Sie auf GitHub: https://github.com/BugForgeNerd/KNXSystemZeitgeber",
+            "DONATION_HEADER": "Spenden zur Stärkung der OpenSource Entwickler",
+            "DONATION_TEXT": "Open Source bietet Kostenersparnis, hohe Sicherheit, Transparenz und Unabhängigkeit von Herstellern. Durch den offenen Quellcode ist Software flexibel anpassbar, interoperabel und profitiert von einer aktiven Community, die Fehler schnell findet und behebt.",
+            "DONATION_INFO": "Wenn Sie mich unterstützen möchten, dann geht das ganz einfach und freiwillig unter dem folgenden Link.",
+            "PAYPAL_LINK": "https://www.paypal.com/donate/?hosted_button_id=GPLYXLH6AJYF8"
+        },
+        "en": {
+            "Active": "Send & Timer active",
+            "KNX_CONNECTOR_NOTICE": "This module requires a connection to the KNX Gateway (Splitter Instanz).",
+            "GA_Time": "Time group address format 8/0/0 (DPT 10.001)",
+            "GA_Date": "Date group address format 8/0/0 (DPT 11.001)",
+            "SEND_TIMES_NOTICE": "Define send times (e.g. 00:00:00, 12:00:00)",
+            "SendTimes": "List of send times",
+            "TIME_COLUMN": "Send time (HH:mm:ss)",
+            "SendNow": "Send time/date manually now",
+            "NoTimes": "No valid times. Timer disabled.",
+            "LICENSE_NOTICE": "This software is licensed under Apache-2.0 and is free for both private and commercial use. You can use it without paying license fees. All liability for damages is excluded. More information about the module and its functionality is available on GitHub: https://github.com/BugForgeNerd/KNXSystemZeitgeber",
+            "DONATION_HEADER": "Support Open-Source Developers",
+            "DONATION_TEXT": "Open source offers cost savings, high security, transparency, and independence from vendors. Its open code allows flexible customization, interoperability, and benefits from an active community that quickly identifies and fixes bugs.",
+            "DONATION_INFO": "If you’d like to support me, you can do so easily and voluntarily via the following link.",
+            "PAYPAL_LINK": "https://www.paypal.com/donate/?hosted_button_id=GPLYXLH6AJYF8"
+        }
+    }
+}
+
