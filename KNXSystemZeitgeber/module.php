@@ -413,14 +413,14 @@ class KNXSystemZeitgeber extends IPSModule
 				"name"    => "GA_Time",
 				"caption" => $this->Translate("GA_Time"),
 				"validate"=> "^\\d{1,2}/\\d{1,2}/\\d{1,2}$",
-				"width"   => "250px"
+				"width"   => "300px"
 			],
 			[
 				"type"    => "ValidationTextBox",
 				"name"    => "GA_Date",
 				"caption" => $this->Translate("GA_Date"),
 				"validate"=> "^\\d{1,2}/\\d{1,2}/\\d{1,2}$",
-				"width"   => "250px"
+				"width"   => "300px"
 			],
 			[
 				"type"    => "Label",
