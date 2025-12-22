@@ -6,8 +6,8 @@
  * sudo /etc/init.d/symcon restart
  *
  * ToDo:
- * - 
- * - 
+ * - Boolean zurückgeben, wenn KSZT_SendKNXTimeAndDate(30864); über Script ausgelöst False wenn exception
+ * - KNX Gateway auf Vorhandensein überprüfen
 */
 
 
@@ -132,9 +132,10 @@ class KNXSystemZeitgeber extends IPSModule
         if (!empty($gaTime)) {
             $parts = explode('/', $gaTime);
             if (count($parts) === 3) {
-                $hours = (int)date('H');
-                $minutes = (int)date('i');
-                $seconds = (int)date('s');
+				$date = new DateTimeImmutable();
+                $hours = (int)$date->format('H');
+                $minutes = (int)$date->format('i');
+                $seconds = (int)$date->format('s');
 
 				// chr(0x80) ist der Write-Befehl
 				$knx_time_payload = chr(0x80) . $this->EncodeDPT10_Time($hours, $minutes, $seconds);
@@ -151,7 +152,7 @@ class KNXSystemZeitgeber extends IPSModule
 					)
 				);	
 				$result = $this->SendDataToParent($json);
-				IPS_LogMessage("KNXsystime", "Zeit auf den Bus gesetzt: " . $hours . ":" . $minutes);
+				IPS_LogMessage("KNXsystime", "Zeit auf den Bus gesetzt: " . $date->format('H:i:s'));
             }
         }
 
@@ -159,9 +160,10 @@ class KNXSystemZeitgeber extends IPSModule
         if (!empty($gaDate)) {
             $parts = explode('/', $gaDate);
             if (count($parts) === 3) {
-                $day   = (int)date('d'); // 11
-                $month = (int)date('m'); // 12
-                $year  = (int)date('Y'); // 2025 (4-stellig für die Funktion)
+				$date = new DateTimeImmutable(); // aktuelles Datum/Uhrzeit
+                $day   = (int)$date->format('d'); // 11
+                $month = (int)$date->format('m'); // 12
+                $year  = (int)$date->format('Y'); // 2025 (4-stellig für die Funktion)
 
 				// chr(0x80) ist der Write-Befehl
 				$knx_date_payload = chr(0x80) . $this->EncodeDPT11_Date($day, $month, $year);
@@ -178,7 +180,7 @@ class KNXSystemZeitgeber extends IPSModule
 					)
 				);	
 				$result = $this->SendDataToParent($json);
-				IPS_LogMessage("KNXsystime", "Datum auf den Bus gesetzt: " . $day . "." . $month . "." . $year);
+				IPS_LogMessage("KNXsystime", "Datum auf den Bus gesetzt: " . $date->format('d.m.Y'));
             }
         }
 

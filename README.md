@@ -10,7 +10,7 @@ Es unterstützt eine Liste von Sendezeiten, die zyklisch abgearbeitet werden, so
 3. [Software-Installation](#3-software-installation)
 4. [Einrichten der Instanzen in IP-Symcon](#4-einrichten-der-instanzen-in-ip-symcon)
 5. [Statusvariablen und Profile](#5-statusvariablen-und-profile)
-6. [WebFront](#6-webfront)
+6. [Visualisierung und Konfiguration](#6-visualisierung-und-konfiguration)
 7. [PHP-Befehlsreferenz](#7-php-befehlsreferenz)
 
 ### 1. Funktionsumfang
@@ -63,10 +63,11 @@ Die Statusvariablen/Kategorien werden automatisch angelegt. Das Löschen einzeln
 | ----- | --- |
 | Keine |     |
 
-### 6. Visualisierung
+### 6. Visualisierung und Konfiguration
 
-* Im WebFront können die Sendezeiten über die Instanzkonfiguration angepasst werden.
+* In der Instanzkonfiguration des Moduls können die Sendezeiten über die Instanzkonfiguration angepasst werden.
 * Debug-Ausgaben werden im Symcon-Debug-Fenster angezeigt, einschließlich der HEX-Daten für Zeit und Datum.
+* Empfehlung: Die Zeiten nicht zur vollen Stunden, insbesodnere nicht um 00:00 setzen zu lassen. Zur vollen Stunden, insebesondere zur Mitternachtszeit laufen gerne andere automatische Funktionen die das Setzen der Zeit auf den Bus, wenn auch nur kurzzeitig blockieren könnten. Mitternachts läuft beispielsweise von Symcon die Log-Rotation, die kurze Verzögerung verursachen könnte. Zu empfehlen ist das Setzen der Zeit kurz nach 3 Uhr, da dann auch die Zeitumstellung erfasst wird. Darüber hinaus können ein, zwei weitere Aktionen über den Tag verteilt hilfreich sein, wenn einmal der Strom weg war. Dann ist die Zeit wieder schnell gesetzt.
 
 ### 7. PHP-Befehlsreferenz
 
