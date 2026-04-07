@@ -7,7 +7,7 @@
  *
  * ToDo:
  * - Boolean zurückgeben, wenn KSZT_SendKNXTimeAndDate(30864); über Script ausgelöst False wenn exception
- * - KNX Gateway auf Vorhandensein überprüfen
+ * - 
 */
 
 
@@ -39,7 +39,7 @@
  * - GetConfigurationForm(): Liefert das JSON-Konfigurationsformular für die Instanz
  */
 declare(strict_types=1);
-class KNXSystemZeitgeber extends IPSModule
+class KNXSystemZeitgeber extends IPSModuleStrict
 {
 	
 	/**
@@ -53,7 +53,7 @@ class KNXSystemZeitgeber extends IPSModule
 	 * Parameter: keine
 	 * Rückgabewert: void
 	 */
-    public function Create()
+    public function Create(): void
     {
         parent::Create();
 
@@ -67,7 +67,7 @@ class KNXSystemZeitgeber extends IPSModule
 		$this->RegisterTimer("SendKNXTimeTimer", 0, 'KSZT_SendKNXTimeAndDate(' . $this->InstanceID . ');');
 
         // KNX Parent verbinden (GUID des KNX Gateway Interface)
-        $this->ConnectParent("{1C902193-B044-43B8-9433-419F09C641B8}");
+        //$this->ConnectParent("{1C902193-B044-43B8-9433-419F09C641B8}");
     }
 
 
@@ -81,11 +81,20 @@ class KNXSystemZeitgeber extends IPSModule
 	 * Parameter: keine
 	 * Rückgabewert: void
 	 */
-    public function ApplyChanges()
-    {
-        parent::ApplyChanges();
-        $this->SetNextTimerExecution();
-    }
+	public function ApplyChanges(): void
+	{
+		parent::ApplyChanges();
+
+		// Prüfen ob ein aktiver Parent vorhanden ist
+		if (!$this->HasActiveParent()) {
+			$this->SetStatus(IS_INACTIVE);
+			$this->SendDebug("KNXsystime", "Kein aktiver KNX Parent verbunden", 0);
+		} else {
+			$this->SetStatus(IS_ACTIVE);
+		}
+
+		$this->SetNextTimerExecution();
+	}
 
 
 	/**
@@ -100,7 +109,7 @@ class KNXSystemZeitgeber extends IPSModule
 	 * 
 	 * Rückgabewert: void
 	 */
-    public function RequestAction($Ident, $Value)
+    public function RequestAction(string $Ident, mixed $Value): void
     {
 
     }
@@ -118,7 +127,7 @@ class KNXSystemZeitgeber extends IPSModule
 	 * 
 	 * Rückgabewert: void
 	 */
-    public function SendKNXTimeAndDate()
+    public function SendKNXTimeAndDate(): void
     {
 		if (!$this->ReadPropertyBoolean('Active')) {
 			$this->SendDebug("KNXsystime", "Senden übersprungen (Active = false)", 0);
@@ -148,11 +157,11 @@ class KNXSystemZeitgeber extends IPSModule
 						"GroupAddress1" => (int)$parts[0],
 						"GroupAddress2" => (int)$parts[1],
 						"GroupAddress3" => (int)$parts[2],
-						"Data" => utf8_encode($knx_time_payload)
+						"Data" => bin2hex($knx_time_payload)
 					)
 				);	
 				$result = $this->SendDataToParent($json);
-				IPS_LogMessage("KNXsystime", "Zeit auf den Bus gesetzt: " . $date->format('H:i:s'));
+				$this->LogMessage("Zeit auf den Bus gesetzt: " . $date->format('H:i:s'), KL_NOTIFY);
             }
         }
 
@@ -176,11 +185,11 @@ class KNXSystemZeitgeber extends IPSModule
 						"GroupAddress1" => (int)$parts[0],
 						"GroupAddress2" => (int)$parts[1],
 						"GroupAddress3" => (int)$parts[2],
-						"Data" => utf8_encode($knx_date_payload)
+						"Data" => bin2hex($knx_date_payload)
 					)
 				);	
 				$result = $this->SendDataToParent($json);
-				IPS_LogMessage("KNXsystime", "Datum auf den Bus gesetzt: " . $date->format('d.m.Y'));
+				$this->LogMessage("Datum auf den Bus gesetzt: " . $date->format('d.m.Y'), KL_NOTIFY);
             }
         }
 
@@ -381,7 +390,7 @@ class KNXSystemZeitgeber extends IPSModule
 	 * Rückgabewert:
 	 * string - immer leer, da keine Verarbeitung erfolgt
 	 */
-    public function ReceiveData($JSONString)
+    public function ReceiveData(string $JSONString): string
     {
         // Nicht benötigt
         return '';
@@ -398,7 +407,7 @@ class KNXSystemZeitgeber extends IPSModule
 	 * Rückgabewert:
 	 * string - JSON-kodiertes Formular
 	 */
-	public function GetConfigurationForm()
+	public function GetConfigurationForm(): string
 	{
 		$elements = [
 			[
@@ -507,4 +516,3 @@ class KNXSystemZeitgeber extends IPSModule
 
 }
 
-?>

@@ -19,23 +19,23 @@ Es unterstützt eine Liste von Sendezeiten, die zyklisch abgearbeitet werden, so
 * Automatisches Senden des aktuellen Datums (DPT 11.001) an eine KNX-Gruppenadresse.
 * Verwaltung mehrerer Sendezeiten, die täglich abgearbeitet werden.
 * Möglichkeit, das Senden und den Timer über einen Schalter (`Active`) zu aktivieren oder deaktivieren.
-* Debug-Funktionalität zur Anzeige der gesendeten Daten im Symcon Debug-Fenster.
-* Kompatibel mit KNX-Gateway Interfaces über das KNX Splitter-Modul.
+* Debug-Funktionalität zur Anzeige der gesendeten Daten im Symcon-Debug-Fenster.
+* Kompatibel mit KNX-Gateway Interfaces über das KNX-Splitter-Modul.
 
 ### 2. Voraussetzungen
 
-- IP-Symcon ab Version 7.1
-- KNX-Konfigurator oder kompatibles KNX Splitter-Interface.
+- IP-Symcon ab Version 8.1
+- KNX-Gateway beziehungsweise kompatibles KNX-Splitter-Interface
 
 ### 3. Software-Installation
 
 * Über den Module Store das `KNXSystemZeitgeber`-Modul installieren.
 * Alternativ über das Module Control folgende URL hinzufügen:  
-  https://github.com/BugForgeNerd/KNXSystemZeitgeber`
+  https://github.com/BugForgeNerd/KNXSystemZeitgeber
 
 ### 4. Einrichten der Instanzen in IP-Symcon
 
-Unter 'Instanz hinzufügen' kann das `KNXSystemZeitgeber`-Modul mithilfe des Schnellfilters gefunden werden.  
+Unter `Instanz hinzufügen` kann das `KNXSystemZeitgeber`-Modul mithilfe des Schnellfilters gefunden werden.  
 Weitere Informationen zum Hinzufügen von Instanzen in der [Dokumentation der Instanzen](https://www.symcon.de/service/dokumentation/konzepte/instanzen/#Instanz_hinzufügen)
 
 __Konfigurationsseite__:
@@ -49,13 +49,13 @@ __Konfigurationsseite__:
 
 ### 5. Statusvariablen und Profile
 
-Die Statusvariablen/Kategorien werden automatisch angelegt. Das Löschen einzelner kann zu Fehlfunktionen führen.
+Das Modul legt keine Statusvariablen, Kategorien oder Profile an.
 
 #### Statusvariablen
 
-| Name  | Typ | Beschreibung                                          |
-| ----- | --- | ----------------------------------------------------- |
-| Keine |     | Alle Einstellungen erfolgen über Properties und Timer |
+| Name  | Typ | Beschreibung |
+| ----- | --- | ------------ |
+| Keine |     |              |
 
 #### Profile
 
@@ -67,7 +67,7 @@ Die Statusvariablen/Kategorien werden automatisch angelegt. Das Löschen einzeln
 
 * In der Instanzkonfiguration des Moduls können die Sendezeiten über die Instanzkonfiguration angepasst werden.
 * Debug-Ausgaben werden im Symcon-Debug-Fenster angezeigt, einschließlich der HEX-Daten für Zeit und Datum.
-* Empfehlung: Die Zeiten nicht zur vollen Stunden, insbesodnere nicht um 00:00 setzen zu lassen. Zur vollen Stunden, insebesondere zur Mitternachtszeit laufen gerne andere automatische Funktionen die das Setzen der Zeit auf den Bus, wenn auch nur kurzzeitig blockieren könnten. Mitternachts läuft beispielsweise von Symcon die Log-Rotation, die kurze Verzögerung verursachen könnte. Zu empfehlen ist das Setzen der Zeit kurz nach 3 Uhr, da dann auch die Zeitumstellung erfasst wird. Darüber hinaus können ein, zwei weitere Aktionen über den Tag verteilt hilfreich sein, wenn einmal der Strom weg war. Dann ist die Zeit wieder schnell gesetzt.
+* Empfehlung: Die Zeiten nicht zur vollen Stunde, insbesondere nicht um 00:00 Uhr, setzen zu lassen. Zur vollen Stunde, insbesondere zur Mitternachtszeit, laufen gerne andere automatische Funktionen, die das Setzen der Zeit auf den Bus kurzzeitig blockieren könnten. Um Mitternacht läuft beispielsweise von Symcon die Log-Rotation, die kurze Verzögerungen verursachen könnte. Zu empfehlen ist das Setzen der Zeit kurz nach 03:00 Uhr, da dann auch die Zeitumstellung erfasst wird. Darüber hinaus können ein oder zwei weitere Aktionen über den Tag verteilt hilfreich sein, wenn einmal der Strom weg war. Dann ist die Zeit wieder schnell gesetzt.
 
 ### 7. PHP-Befehlsreferenz
 
@@ -77,22 +77,10 @@ Sendet die aktuelle Zeit und das Datum an die konfigurierten KNX-Gruppenadressen
 
 **Beispiel:**
 
-Sendet das Datum und die Uhrzeit die aktuell auf dem System liegt auf den KNX Bus. Die Zahl 12345 ist dabei durch die ID dieses Moduls zu ersetzen.
+Sendet das Datum und die Uhrzeit, die aktuell auf dem System liegen, auf den KNX-Bus. Die Zahl 12345 ist dabei durch die ID dieses Moduls zu ersetzen.
 
 ```php
 KSZT_SendKNXTimeAndDate(12345);
-```
-
-Gibt zurück, ob das Modul aktuell aktiv ist (Senden & Timer). Die Zahl 12345 ist dabei durch die ID dieses Moduls zu ersetzen.
-
-```php
-$active = GetActive(12345);
-```
-
-Aktiviert oder deaktiviert das Senden und den Timer. Die Zahl 12345 ist dabei durch die ID dieses Moduls zu ersetzen.
-
-```php
-SetActive(12345, true);
 ```
 
 ## Screenshots:
