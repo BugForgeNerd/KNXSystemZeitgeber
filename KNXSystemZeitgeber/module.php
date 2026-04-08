@@ -7,7 +7,7 @@
  *
  * ToDo:
  * - Boolean zurückgeben, wenn KSZT_SendKNXTimeAndDate(30864); über Script ausgelöst False wenn exception
- * - 
+ * - NTP Zeit als Option anstatt Systemzeit verwenden. (Fallback jed. immer Systemzeit)
 */
 
 
@@ -53,18 +53,26 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 	 * Parameter: keine
 	 * Rückgabewert: void
 	 */
-    public function Create(): void
-    {
-        parent::Create();
+	public function Create(): void
+	{
+		parent::Create();
 
-        // Properties
-        $this->RegisterPropertyString('SendTimes', '[]');
-        $this->RegisterPropertyString('GA_Time', '');
-        $this->RegisterPropertyString('GA_Date', '');
+		// Properties
+		$this->RegisterPropertyString('SendTimes', '[]');
+		$this->RegisterPropertyString('GA_Time', '');
+		$this->RegisterPropertyString('GA_Date', '');
 		$this->RegisterPropertyBoolean('Active', true); // Timer/Sendungen aktiv oder nicht
 
-        // Timer initial registrieren
+		// Intervallmodus
+		$this->RegisterPropertyBoolean('UseInterval', false); // regelmäßigen Aufruf zusätzlich aktivieren
+		$this->RegisterPropertyInteger('IntervalMinutes', 60); // Intervall in Minuten
+
+		// Attribut zur Vermeidung doppelter Ausführung bei gleichzeitigem Timer-Trigger
+		$this->RegisterAttributeInteger('LastSendTimestamp', 0);
+
+		// Timer initial registrieren
 		$this->RegisterTimer("SendKNXTimeTimer", 0, 'KSZT_SendKNXTimeAndDate(' . $this->InstanceID . ');');
+		$this->RegisterTimer("SendKNXIntervalTimer", 0, 'KSZT_SendKNXTimeAndDate(' . $this->InstanceID . ');');
 
         // KNX Parent verbinden (GUID des KNX Gateway Interface)
         //$this->ConnectParent("{1C902193-B044-43B8-9433-419F09C641B8}");
@@ -76,7 +84,9 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 	 * 
 	 * Wird aufgerufen, wenn die Modulkonfiguration geändert wurde.
 	 * - Ruft die übergeordnete ApplyChanges-Methode auf
-	 * - Setzt den Timer für die nächste geplante Sendezeit neu
+	 * - Prüft, ob ein kompatibler Parent vorhanden ist
+	 * - Setzt den Instanzstatus entsprechend
+	 * - Setzt die Timer für feste Sendezeiten und Intervall neu
 	 * 
 	 * Parameter: keine
 	 * Rückgabewert: void
@@ -94,6 +104,7 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 		}
 
 		$this->SetNextTimerExecution();
+		$this->SetIntervalExecution();
 	}
 
 
@@ -120,82 +131,92 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 	 * 
 	 * Sendet die aktuelle Uhrzeit und das aktuelle Datum an die in den Eigenschaften
 	 * definierten KNX-Gruppenadressen. Die Funktion prüft, ob das Modul aktiv ist
-	 * (Eigenschaft 'Active') und sendet nur dann. Anschließend wird der Timer für
-	 * die nächste Sendezeit neu gesetzt.
+	 * (Eigenschaft 'Active') und sendet nur dann. Anschließend werden die Timer für
+	 * feste Sendezeiten und Intervall neu gesetzt bzw. geprüft.
 	 * 
 	 * Parameter: keine
 	 * 
 	 * Rückgabewert: void
 	 */
-    public function SendKNXTimeAndDate(): void
-    {
+	public function SendKNXTimeAndDate(): void
+	{
 		if (!$this->ReadPropertyBoolean('Active')) {
 			$this->SendDebug("KNXsystime", "Senden übersprungen (Active = false)", 0);
 			return;
 		}
-	
-        $gaTime = $this->ReadPropertyString('GA_Time');
-        $gaDate = $this->ReadPropertyString('GA_Date');
+
+		// Doppelte Ausführung vermeiden, wenn fester Timer und Intervalltimer in derselben Sekunde auslösen
+		$nowTs = time();
+		$lastSendTs = $this->ReadAttributeInteger('LastSendTimestamp');
+		if ($lastSendTs === $nowTs) {
+			$this->SendDebug("KNXsystime", "Doppelte Ausführung in derselben Sekunde unterdrückt", 0);
+			return;
+		}
+		$this->WriteAttributeInteger('LastSendTimestamp', $nowTs);
+
+		$gaTime = $this->ReadPropertyString('GA_Time');
+		$gaDate = $this->ReadPropertyString('GA_Date');
 		
-        // --- Zeit senden ---
-        if (!empty($gaTime)) {
-            $parts = explode('/', $gaTime);
-            if (count($parts) === 3) {
+		// --- Zeit senden ---
+		if (!empty($gaTime)) {
+			$parts = explode('/', $gaTime);
+			if (count($parts) === 3) {
 				$date = new DateTimeImmutable();
-                $hours = (int)$date->format('H');
-                $minutes = (int)$date->format('i');
-                $seconds = (int)$date->format('s');
+				$hours = (int) $date->format('H');
+				$minutes = (int) $date->format('i');
+				$seconds = (int) $date->format('s');
 
 				// chr(0x80) ist der Write-Befehl
 				$knx_time_payload = chr(0x80) . $this->EncodeDPT10_Time($hours, $minutes, $seconds);
-				//IPS_LogMessage("KNXsystime", "HexWert Time: " . bin2hex($knx_time_payload));
 				$this->SendDebug("KNXsystime", "HexWert Time: " . bin2hex($knx_time_payload), 0);
 				
 				$json = json_encode(
-					Array(
-						"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}", 
-						"GroupAddress1" => (int)$parts[0],
-						"GroupAddress2" => (int)$parts[1],
-						"GroupAddress3" => (int)$parts[2],
+					[
+						"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
+						"GroupAddress1" => (int) $parts[0],
+						"GroupAddress2" => (int) $parts[1],
+						"GroupAddress3" => (int) $parts[2],
 						"Data" => bin2hex($knx_time_payload)
-					)
-				);	
+					]
+				);
 				$result = $this->SendDataToParent($json);
 				$this->LogMessage("Zeit auf den Bus gesetzt: " . $date->format('H:i:s'), KL_NOTIFY);
-            }
-        }
+			}
+		}
 
-        // --- Datum senden ---
-        if (!empty($gaDate)) {
-            $parts = explode('/', $gaDate);
-            if (count($parts) === 3) {
+		// --- Datum senden ---
+		if (!empty($gaDate)) {
+			$parts = explode('/', $gaDate);
+			if (count($parts) === 3) {
 				$date = new DateTimeImmutable(); // aktuelles Datum/Uhrzeit
-                $day   = (int)$date->format('d'); // 11
-                $month = (int)$date->format('m'); // 12
-                $year  = (int)$date->format('Y'); // 2025 (4-stellig für die Funktion)
+				$day   = (int) $date->format('d');
+				$month = (int) $date->format('m');
+				$year  = (int) $date->format('Y');
 
 				// chr(0x80) ist der Write-Befehl
 				$knx_date_payload = chr(0x80) . $this->EncodeDPT11_Date($day, $month, $year);
-				//IPS_LogMessage("KNXsystime", "HexWert Date: " . bin2hex($knx_date_payload));
 				$this->SendDebug("KNXsystime", "HexWert  Dat: " . bin2hex($knx_date_payload), 0);
 				
-				 $json = json_encode(
-					Array(
-						"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}", 
-						"GroupAddress1" => (int)$parts[0],
-						"GroupAddress2" => (int)$parts[1],
-						"GroupAddress3" => (int)$parts[2],
+				$json = json_encode(
+					[
+						"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
+						"GroupAddress1" => (int) $parts[0],
+						"GroupAddress2" => (int) $parts[1],
+						"GroupAddress3" => (int) $parts[2],
 						"Data" => bin2hex($knx_date_payload)
-					)
-				);	
+					]
+				);
 				$result = $this->SendDataToParent($json);
 				$this->LogMessage("Datum auf den Bus gesetzt: " . $date->format('d.m.Y'), KL_NOTIFY);
-            }
-        }
+			}
+		}
 
-        // Nächsten Timer setzen
-        $this->SetNextTimerExecution();
-    }
+		// Feste Sendezeiten als Einmal-Timer immer neu berechnen
+		$this->SetNextTimerExecution();
+
+		// Intervalltimer sicherheitshalber prüfen/aktualisieren
+		//$this->SetIntervalExecution();
+	}
 
 
 	/**
@@ -301,82 +322,77 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 	 * 
 	 * Schritte:
 	 * 1. Prüft, ob die Eigenschaft 'Active' aktiviert ist; sonst Timer deaktivieren.
-	 * 2. Liest die Sendezeiten aus der Property 'SendTimes'.
-	 * 3. Filtert nur gültige Zeiten (Stunde + Minute) heraus.
-	 * 4. Sortiert die Zeiten und sucht die nächste kommende Zeit.
-	 * 5. Setzt den Timer auf das Intervall bis zur nächsten Zeit (in Millisekunden).
+	 * 2. Ermittelt die nächste feste Sendezeit aus der Property 'SendTimes'.
+	 * 3. Setzt den Timer auf das Intervall bis zur nächsten Zeit (in Millisekunden).
 	 * 
 	 * Parameter: keine
 	 * Rückgabewert: keiner
 	 */
-	private function SetNextTimerExecution()
+	private function SetNextTimerExecution(): void
 	{
-
 		if (!$this->ReadPropertyBoolean('Active')) {
 			$this->SetTimerInterval('SendKNXTimeTimer', 0);
-			$this->SendDebug("KNXsystime", "Timer deaktiviert (Active = false)", 0);
+			$this->SendDebug("KNXsystime", "Fester Timer deaktiviert (Active = false)", 0);
 			return;
 		}
-	
-		$times = json_decode($this->ReadPropertyString('SendTimes'), true);
-		//$this->SendDebug("KNXsystime", "Inhalt: " . print_r($times, true), 0);
 
-		$now = time();
-		$today = date('Y-m-d');
+		$nextScheduledTime = $this->GetNextScheduledTimeFromSendTimes();
 
-		// Keine Zeiten vorhanden -> Timer aus
-		if (!is_array($times) || empty($times)) {
+		// Keine gültige feste Zeit vorhanden -> Timer aus
+		if ($nextScheduledTime === null) {
 			$this->SetTimerInterval('SendKNXTimeTimer', 0);
-			$this->SendDebug("KNXsystime", "Keine gültigen Zeiten. Timer deaktiviert.", 0);
+			$this->SendDebug("KNXsystime", "Keine gültigen festen Sendezeiten. Timer deaktiviert.", 0);
 			return;
 		}
 
-		// Nur gültige Zeiten behalten (hour + minute)
-		$sendTimes = [];
-		foreach ($times as $t) {
-			if (isset($t['Time'])) {
-				$timeObj = json_decode($t['Time'], true);
-				if (is_array($timeObj) && isset($timeObj['hour'], $timeObj['minute'])) {
-					$hh = str_pad((string)$timeObj['hour'], 2, '0', STR_PAD_LEFT);
-					$mm = str_pad((string)$timeObj['minute'], 2, '0', STR_PAD_LEFT);
-					$sendTimes[] = "$hh:$mm";
-				}
-			}
-		}
-
-		if (empty($sendTimes)) {
-			$this->SetTimerInterval('SendKNXTimeTimer', 0);
-			$this->SendDebug("KNXsystime", "Keine gültigen Zeiten. Timer deaktiviert.", 0);
-			return;
-		}
-
-		sort($sendTimes);
-
-		// Nächste Zeit suchen
-		$next = false;
-		foreach ($sendTimes as $t) {
-			list($h, $m) = explode(':', $t);
-			$ts = strtotime("$today $h:$m:00");
-			if ($ts > $now) {
-				$next = $ts;
-				break;
-			}
-		}
-
-		// Wenn keine Zeit mehr heute -> erste Zeit morgen
-		if ($next === false) {
-			list($h, $m) = explode(':', $sendTimes[0]);
-			$next = strtotime(date('Y-m-d', strtotime('+1 day')) . " $h:$m:00");
-		}
-
-		// Timer setzen
-		$intervalMs = ($next - $now) * 1000;
+		$intervalMs = ($nextScheduledTime - time()) * 1000;
 		$intervalMs = max(0, min($intervalMs, 2147483647)); // max 32bit
 		$this->SetTimerInterval('SendKNXTimeTimer', $intervalMs);
 
-		$this->SendDebug("KNXsystime", "Nächster Sendezeitpunkt: " . date('d.m.Y H:i:s', $next) . " (in $intervalMs ms)", 0);
+		$this->SendDebug("KNXsystime", "Nächste feste Sendezeit: " . date('d.m.Y H:i:s', $nextScheduledTime) . " (in $intervalMs ms)", 0);
 	}
 
+
+	/**
+	 * SetIntervalExecution
+	 * 
+	 * Aktiviert oder deaktiviert den Intervalltimer basierend auf den Eigenschaften
+	 * 'Active', 'UseInterval' und 'IntervalMinutes'.
+	 * 
+	 * Variante A:
+	 * Der Intervalltimer startet ab Aktivierung bzw. Übernahme der Konfiguration und
+	 * löst danach regelmäßig alle X Minuten aus.
+	 * 
+	 * Parameter: keine
+	 * Rückgabewert: keiner
+	 */
+	private function SetIntervalExecution(): void
+	{
+		if (!$this->ReadPropertyBoolean('Active')) {
+			$this->SetTimerInterval('SendKNXIntervalTimer', 0);
+			$this->SendDebug("KNXsystime", "Intervalltimer deaktiviert (Active = false)", 0);
+			return;
+		}
+
+		if (!$this->ReadPropertyBoolean('UseInterval')) {
+			$this->SetTimerInterval('SendKNXIntervalTimer', 0);
+			$this->SendDebug("KNXsystime", "Intervalltimer deaktiviert (UseInterval = false)", 0);
+			return;
+		}
+
+		$intervalMinutes = $this->ReadPropertyInteger('IntervalMinutes');
+		if ($intervalMinutes <= 0) {
+			$this->SetTimerInterval('SendKNXIntervalTimer', 0);
+			$this->SendDebug("KNXsystime", "Intervalltimer deaktiviert (IntervalMinutes ungültig)", 0);
+			return;
+		}
+
+		$intervalMs = $intervalMinutes * 60 * 1000;
+		$intervalMs = max(0, min($intervalMs, 2147483647)); // max 32bit
+		$this->SetTimerInterval('SendKNXIntervalTimer', $intervalMs);
+
+		$this->SendDebug("KNXsystime", "Intervalltimer aktiviert: alle {$intervalMinutes} Minute(n)", 0);
+	}
 
 	/**
 	 * ReceiveData
@@ -453,9 +469,18 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 						"edit"    => ["type"=>"SelectTime"]
 					]
 				]
+			],
+			[
+				"type"    => "CheckBox",
+				"name"    => "UseInterval",
+				"caption" => $this->Translate("UseInterval")
+			],
+			[
+				"type"    => "NumberSpinner",
+				"name"    => "IntervalMinutes",
+				"caption" => $this->Translate("IntervalMinutes")
 			]
 		];
-
 		$actions = [
 			[
 				"type"    => "Button",
@@ -512,6 +537,62 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 			"elements" => $elements,
 			"actions"  => $actions
 		]);
+	}
+
+	/**
+	 * GetNextScheduledTimeFromSendTimes
+	 * 
+	 * Ermittelt aus der Property 'SendTimes' den nächsten geplanten Ausführungszeitpunkt
+	 * als Unix-Timestamp. Gibt null zurück, wenn keine gültige Zeit vorhanden ist.
+	 * 
+	 * Parameter: keine
+	 * 
+	 * Rückgabewert:
+	 *  - ?int : Unix-Timestamp der nächsten Sendezeit oder null
+	 */
+	private function GetNextScheduledTimeFromSendTimes(): ?int
+	{
+		$times = json_decode($this->ReadPropertyString('SendTimes'), true);
+
+		// Keine Zeiten vorhanden
+		if (!is_array($times) || empty($times)) {
+			return null;
+		}
+
+		$now = time();
+		$today = date('Y-m-d');
+
+		// Nur gültige Zeiten behalten (hour + minute)
+		$sendTimes = [];
+		foreach ($times as $t) {
+			if (isset($t['Time'])) {
+				$timeObj = json_decode($t['Time'], true);
+				if (is_array($timeObj) && isset($timeObj['hour'], $timeObj['minute'])) {
+					$hh = str_pad((string) $timeObj['hour'], 2, '0', STR_PAD_LEFT);
+					$mm = str_pad((string) $timeObj['minute'], 2, '0', STR_PAD_LEFT);
+					$sendTimes[] = "$hh:$mm";
+				}
+			}
+		}
+
+		if (empty($sendTimes)) {
+			return null;
+		}
+
+		sort($sendTimes);
+
+		// Nächste Zeit heute suchen
+		foreach ($sendTimes as $t) {
+			[$h, $m] = explode(':', $t);
+			$ts = strtotime("$today $h:$m:00");
+			if ($ts > $now) {
+				return $ts;
+			}
+		}
+
+		// Wenn keine Zeit mehr heute -> erste Zeit morgen
+		[$h, $m] = explode(':', $sendTimes[0]);
+		return strtotime(date('Y-m-d', strtotime('+1 day')) . " $h:$m:00");
 	}
 
 }

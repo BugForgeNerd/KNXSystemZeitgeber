@@ -18,7 +18,8 @@ Es unterstützt eine Liste von Sendezeiten, die zyklisch abgearbeitet werden, so
 * Automatisches Senden der aktuellen Zeit (DPT 10.001) an eine KNX-Gruppenadresse.
 * Automatisches Senden des aktuellen Datums (DPT 11.001) an eine KNX-Gruppenadresse.
 * Verwaltung mehrerer Sendezeiten, die täglich abgearbeitet werden.
-* Möglichkeit, das Senden und den Timer über einen Schalter (`Active`) zu aktivieren oder deaktivieren.
+* Optionaler zusätzlicher Intervallaufruf in frei definierbaren Minutenabständen.
+* Möglichkeit, das Senden und die Timer über einen Schalter (`Active`) zu aktivieren oder deaktivieren.
 * Debug-Funktionalität zur Anzeige der gesendeten Daten im Symcon-Debug-Fenster.
 * Kompatibel mit KNX-Gateway Interfaces über das KNX-Splitter-Modul.
 
@@ -42,10 +43,12 @@ __Konfigurationsseite__:
 
 | Name      | Beschreibung                                                     |
 | --------- | ---------------------------------------------------------------- |
-| Active    | Aktiviert/deaktiviert das Senden & Timer                         |
-| GA_Time   | KNX-Gruppenadresse für die Zeit (DPT 10.001, Format z.B. 8/0/1)  |
-| GA_Date   | KNX-Gruppenadresse für das Datum (DPT 11.001, Format z.B. 8/0/0) |
-| SendTimes | Liste der Sendezeiten (HH:mm:ss)                                 |
+| Active          | Aktiviert/deaktiviert das Senden & Timer                                 |
+| GA_Time         | KNX-Gruppenadresse für die Zeit (DPT 10.001, Format z.B. 8/0/1)          |
+| GA_Date         | KNX-Gruppenadresse für das Datum (DPT 11.001, Format z.B. 8/0/0)         |
+| SendTimes       | Liste der festen Sendezeiten (HH:mm:ss)                                  |
+| UseInterval     | Aktiviert zusätzlich einen regelmäßigen Aufruf in Minutenabständen        |
+| IntervalMinutes | Minutenabstand für den zusätzlichen regelmäßigen Aufruf                   |
 
 ### 5. Statusvariablen und Profile
 
@@ -65,7 +68,7 @@ Das Modul legt keine Statusvariablen, Kategorien oder Profile an.
 
 ### 6. Visualisierung und Konfiguration
 
-* In der Instanzkonfiguration des Moduls können die Sendezeiten über die Instanzkonfiguration angepasst werden.
+* In der Instanzkonfiguration des Moduls können feste Sendezeiten sowie optional ein zusätzlicher regelmäßiger Aufruf in Minutenabständen konfiguriert werden.
 * Debug-Ausgaben werden im Symcon-Debug-Fenster angezeigt, einschließlich der HEX-Daten für Zeit und Datum.
 * Empfehlung: Die Zeiten nicht zur vollen Stunde, insbesondere nicht um 00:00 Uhr, setzen zu lassen. Zur vollen Stunde, insbesondere zur Mitternachtszeit, laufen gerne andere automatische Funktionen, die das Setzen der Zeit auf den Bus kurzzeitig blockieren könnten. Um Mitternacht läuft beispielsweise von Symcon die Log-Rotation, die kurze Verzögerungen verursachen könnte. Zu empfehlen ist das Setzen der Zeit kurz nach 03:00 Uhr, da dann auch die Zeitumstellung erfasst wird. Darüber hinaus können ein oder zwei weitere Aktionen über den Tag verteilt hilfreich sein, wenn einmal der Strom weg war. Dann ist die Zeit wieder schnell gesetzt.
 
@@ -73,7 +76,7 @@ Das Modul legt keine Statusvariablen, Kategorien oder Profile an.
 
 #### `KSZT_SendKNXTimeAndDate(int $InstanceID)`
 
-Sendet die aktuelle Zeit und das Datum an die konfigurierten KNX-Gruppenadressen und setzt den nächsten Timer.
+Sendet die aktuelle Zeit und das Datum an die konfigurierten KNX-Gruppenadressen und setzt den nächsten festen Timer.
 
 **Beispiel:**
 
