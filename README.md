@@ -1,93 +1,262 @@
-# KNXSystemZeitgeber
+# KNXSystemZeitgeber / NTPZeit
 
-Modul zur automatischen Übertragung von Zeit- und Datumswerten an KNX-Gruppenadressen.  
-Es unterstützt eine Liste von Sendezeiten, die zyklisch abgearbeitet werden, sowie das Aktivieren/Deaktivieren des Sendens über einen Schalter in der Konfiguration.
+Diese Modulsammlung besteht aus zwei eigenständigen, aber miteinander kombinierbaren Modulen:
 
-### Inhaltsverzeichnis
+- **KNXSystemZeitgeber** → sendet Zeit und Datum auf den KNX Bus
+- **NTPZeit** → ermittelt eine präzise Zeit über NTP Server
 
-1. [Funktionsumfang](#1-funktionsumfang)
-2. [Voraussetzungen](#2-voraussetzungen)
-3. [Software-Installation](#3-software-installation)
-4. [Einrichten der Instanzen in IP-Symcon](#4-einrichten-der-instanzen-in-ip-symcon)
-5. [Statusvariablen und Profile](#5-statusvariablen-und-profile)
-6. [Visualisierung und Konfiguration](#6-visualisierung-und-konfiguration)
-7. [PHP-Befehlsreferenz](#7-php-befehlsreferenz)
+Beide Module können **unabhängig voneinander** betrieben werden.  
+Optional kann der KNXSystemZeitgeber die Zeit aus dem NTPZeit Modul beziehen.
 
-### 1. Funktionsumfang
+---
 
-* Automatisches Senden der aktuellen Zeit (DPT 10.001) an eine KNX-Gruppenadresse.
-* Automatisches Senden des aktuellen Datums (DPT 11.001) an eine KNX-Gruppenadresse.
-* Verwaltung mehrerer Sendezeiten, die täglich abgearbeitet werden.
-* Optionaler zusätzlicher Intervallaufruf in frei definierbaren Minutenabständen.
-* Möglichkeit, das Senden und die Timer über einen Schalter (`Active`) zu aktivieren oder deaktivieren.
-* Debug-Funktionalität zur Anzeige der gesendeten Daten im Symcon-Debug-Fenster.
-* Kompatibel mit KNX-Gateway Interfaces über das KNX-Splitter-Modul.
+# Inhaltsverzeichnis
 
-### 2. Voraussetzungen
+1. Funktionsumfang
+2. Modulübersicht
+3. Voraussetzungen
+4. Installation
+5. Zusammenspiel der Module
+6. Hintergrund: Direkte Socket-Abfrage
+7. KNXSystemZeitgeber – Konfiguration
+8. NTPZeit – Konfiguration
+9. PHP Befehle
+10. Screenshots
+
+---
+
+# 1. Funktionsumfang
+
+## KNXSystemZeitgeber
+- Senden von Zeit und Datum auf den KNX Bus
+- Unterstützung für **DPT 10.001 + DPT 11.001** oder alternativ **DPT 19.001**
+- Umschaltbares Sendeformat im Konfigurationsformular
+- Liste fester Sendezeiten
+- zusätzlicher Intervallbetrieb
+- Auswahl der Zeitquelle (System / NTP)
+- Logging optional abschaltbar
+- Debugausgabe mit lesbarer Zeit + HEX
+
+## NTPZeit
+- Zeitabfrage von primärem NTP Server
+- automatischer Fallback auf zweiten NTP Server
+- optionaler Fallback auf Systemzeit
+- Live-Zeitabfrage durch andere Module
+- periodische Synchronisation möglich
+- Debug + Genauigkeitshinweis
+
+---
+
+# 2. Modulübersicht
+
+## KNXSystemZeitgeber
+Dieses Modul sendet Zeit und Datum auf KNX Gruppenadressen.
+
+Unterstützte KNX-Datenpunktformate:
+- **DPT 10.001** → Uhrzeit
+- **DPT 11.001** → Datum
+- **DPT 19.001** → kombiniertes Datum/Uhrzeit
+
+Die Zeitquelle kann sein:
+- Systemzeit
+- Zeit aus dem NTPZeit Modul
+
+Das Modul arbeitet vollständig unabhängig und kann auch ohne NTPZeit betrieben werden.
+
+## NTPZeit
+Dieses Modul stellt eine präzisere Zeitquelle bereit.
+Es kann:
+- eigenständig genutzt werden
+- von anderen Modulen abgefragt werden
+- vom KNXSystemZeitgeber verwendet werden
+
+Das Modul erzeugt Variablen:
+- Datum
+- Uhrzeit
+- letzte Synchronisation
+- Zeitquelle
+
+---
+
+# 3. Voraussetzungen
 
 - IP-Symcon ab Version 8.1
-- KNX-Gateway beziehungsweise kompatibles KNX-Splitter-Interface
+- KNX Gateway (nur für KNXSystemZeitgeber)
 
-### 3. Software-Installation
+Optional:
+- Internetzugang für NTPZeit
 
-* Über den Module Store das `KNXSystemZeitgeber`-Modul installieren.
-* Alternativ über das Module Control folgende URL hinzufügen:  
-  https://github.com/BugForgeNerd/KNXSystemZeitgeber
+---
 
-### 4. Einrichten der Instanzen in IP-Symcon
+# 4. Installation
 
-Unter `Instanz hinzufügen` kann das `KNXSystemZeitgeber`-Modul mithilfe des Schnellfilters gefunden werden.  
-Weitere Informationen zum Hinzufügen von Instanzen in der [Dokumentation der Instanzen](https://www.symcon.de/service/dokumentation/konzepte/instanzen/#Instanz_hinzufügen)
+Repository hinzufügen:
 
-__Konfigurationsseite__:
+https://github.com/BugForgeNerd/KNXSystemZeitgeber
 
-| Name      | Beschreibung                                                     |
-| --------- | ---------------------------------------------------------------- |
-| Active          | Aktiviert/deaktiviert das Senden & Timer                                 |
-| GA_Time         | KNX-Gruppenadresse für die Zeit (DPT 10.001, Format z.B. 8/0/1)          |
-| GA_Date         | KNX-Gruppenadresse für das Datum (DPT 11.001, Format z.B. 8/0/0)         |
-| SendTimes       | Liste der festen Sendezeiten (HH:mm:ss)                                  |
-| UseInterval     | Aktiviert zusätzlich einen regelmäßigen Aufruf in Minutenabständen        |
-| IntervalMinutes | Minutenabstand für den zusätzlichen regelmäßigen Aufruf                   |
+Danach stehen beide Module zur Verfügung:
 
-### 5. Statusvariablen und Profile
+- KNXSystemZeitgeber
+- NTPZeit
 
-Das Modul legt keine Statusvariablen, Kategorien oder Profile an.
+---
 
-#### Statusvariablen
+# 5. Zusammenspiel der Module
 
-| Name  | Typ | Beschreibung |
-| ----- | --- | ------------ |
-| Keine |     |              |
+Der KNXSystemZeitgeber kann optional das NTPZeit Modul verwenden.
 
-#### Profile
+Ablauf:
 
-| Name  | Typ |
-| ----- | --- |
-| Keine |     |
+1. KNXSystemZeitgeber fragt NTPZeit ab
+2. NTPZeit fragt NTP Server ab
+3. Zeit wird synchron zurückgegeben
+4. KNXSystemZeitgeber sendet Zeit auf KNX
 
-### 6. Visualisierung und Konfiguration
+Fallback Reihenfolge:
 
-* In der Instanzkonfiguration des Moduls können feste Sendezeiten sowie optional ein zusätzlicher regelmäßiger Aufruf in Minutenabständen konfiguriert werden.
-* Debug-Ausgaben werden im Symcon-Debug-Fenster angezeigt, einschließlich der HEX-Daten für Zeit und Datum.
-* Empfehlung: Die Zeiten nicht zur vollen Stunde, insbesondere nicht um 00:00 Uhr, setzen zu lassen. Zur vollen Stunde, insbesondere zur Mitternachtszeit, laufen gerne andere automatische Funktionen, die das Setzen der Zeit auf den Bus kurzzeitig blockieren könnten. Um Mitternacht läuft beispielsweise von Symcon die Log-Rotation, die kurze Verzögerungen verursachen könnte. Zu empfehlen ist das Setzen der Zeit kurz nach 03:00 Uhr, da dann auch die Zeitumstellung erfasst wird. Darüber hinaus können ein oder zwei weitere Aktionen über den Tag verteilt hilfreich sein, wenn einmal der Strom weg war. Dann ist die Zeit wieder schnell gesetzt.
+1. Primärer NTP Server
+2. Sekundärer NTP Server
+3. Systemzeit
 
-### 7. PHP-Befehlsreferenz
+Falls das NTP Modul:
+- nicht vorhanden
+- nicht erreichbar
+- keine gültige Zeit liefert
 
-#### `KSZT_SendKNXTimeAndDate(int $InstanceID)`
+wird automatisch die Systemzeit verwendet.
 
-Sendet die aktuelle Zeit und das Datum an die konfigurierten KNX-Gruppenadressen und setzt den nächsten festen Timer.
+---
 
-**Beispiel:**
+# 6. Hintergrund: Direkte Socket-Abfrage
 
-Sendet das Datum und die Uhrzeit, die aktuell auf dem System liegen, auf den KNX-Bus. Die Zahl 12345 ist dabei durch die ID dieses Moduls zu ersetzen.
+Das Modul NTPZeit verwendet **keinen UDP Parent**.
+
+Grund:
+Der Symcon Parent Datenfluss arbeitet asynchron.
+
+Bei asynchroner Kommunikation könnte:
+- eine alte Zeit verwendet werden
+- eine gepufferte Antwort eintreffen
+- KNX falsche Zeit senden
+
+Deshalb wird bewusst:
+- ein direkter UDP Socket geöffnet
+- synchron auf Antwort gewartet
+- Zeit sofort zurückgegeben
+
+Vorteile:
+
+- deterministische Zeit
+- keine Pufferung
+- Live-Abfrage möglich
+- präzise KNX Synchronisation
+
+---
+
+# 7. KNXSystemZeitgeber – Konfiguration
+
+## Sendeformat
+
+Der KNXSystemZeitgeber unterstützt zwei Betriebsarten:
+
+### Modus 1: Getrennte Telegramme
+In diesem Modus werden Zeit und Datum wie bisher getrennt gesendet:
+- **GA_Time** → KNX DPT 10.001
+- **GA_Date** → KNX DPT 11.001
+
+Es werden zwei Telegramme auf den Bus gesendet:
+- ein Telegramm für die Uhrzeit
+- ein Telegramm für das Datum
+
+### Modus 2: Kombiniertes Telegramm
+In diesem Modus wird Datum und Uhrzeit gemeinsam gesendet:
+- **GA_DateTime** → KNX DPT 19.001
+
+Es wird ein gemeinsames 8-Byte-Telegramm auf den Bus gesendet.
+
+## Besonderheiten bei DPT 19.001
+
+Beim Versand über **DPT 19.001** werden folgende Informationen übertragen:
+- Jahr
+- Monat
+- Tag
+- Wochentag
+- Stunde
+- Minute
+- Sekunde
+- Sommerzeit-Information
+- Working-Day-Information
+- Qualitäts-/Statusbits
+
+Verwendete Logik im Modul:
+- **Wochentag** wird automatisch aus dem Datum berechnet
+- **Sommerzeit** wird automatisch anhand der System-/NTP-Zeit gesetzt
+- **Working Day**: alle Tage außer Sonntag gelten als Arbeitstag
+- **Qualität** wird neutral gesendet
+- **Fault** wird auf „kein Fehler“ gesetzt
+
+## Konfigurationsoptionen
+
+| Option | Beschreibung |
+|--------|--------------|
+| Active | Modul aktiv |
+| SendFormat | Auswahl zwischen DPT 10.001 + 11.001 oder DPT 19.001 |
+| GA_Time | Gruppenadresse Zeit für DPT 10.001 |
+| GA_Date | Gruppenadresse Datum für DPT 11.001 |
+| GA_DateTime | Gruppenadresse für kombiniertes Datum/Uhrzeit per DPT 19.001 |
+| TimeSource | Systemzeit oder NTP |
+| NTPTimeModuleID | NTP Modul Instanz |
+| SendTimes | feste Sendezeiten |
+| UseInterval | Intervall aktiv |
+| IntervalMinutes | Intervall Minuten |
+| EnableSendLog | Logmeldungen ein/aus |
+
+Hinweis:
+Je nach gewähltem **SendFormat** werden im Konfigurationsformular entweder die Felder **GA_Time** und **GA_Date** oder das Feld **GA_DateTime** verwendet.
+
+---
+
+# 8. NTPZeit – Konfiguration
+
+| Option | Beschreibung |
+|--------|--------------|
+| Active | Modul aktiv |
+| PrimaryServer | primärer NTP Server |
+| SecondaryServer | Backup NTP Server |
+| UpdateInterval | Synchronisationsintervall |
+| Timeout | Timeout |
+| UseSystemFallback | Systemzeit fallback |
+
+---
+
+# 9. PHP Befehle
+
+KNXSystemZeitgeber
 
 ```php
 KSZT_SendKNXTimeAndDate(12345);
 ```
 
-## Screenshots:
+NTPZeit
 
-<div>
-<img width="800" alt="Screenshot" src="imgs/Screenshot_ModulKNXSystemZeitgeber1.png">
-</div>
+```php
+NTPZEIT_GetLiveUnixTime(12345);
+```
+
+---
+
+# 10. Screenshots
+
+### Konfigurationsformular (Backend)
+
+Ansicht im Konfigurationsformular des Moduls KNXSystemZeitgeber:
+
+![Konfiguration](imgs/Screenshot_ModulKNXSystemZeitgeber2.png)
+
+Ansicht im Konfigurationsformular des Moduls KNXSystemZeitgeber:
+
+![Konfiguration](imgs/Screenshot_ModulKNXSystemZeitgeber3.png)
+
+Ansicht im Konfigurationsformular des Moduls NTPZeit:
+
+![Konfiguration](imgs/Screenshot_ModulKNXSystemZeitgeber4.png)

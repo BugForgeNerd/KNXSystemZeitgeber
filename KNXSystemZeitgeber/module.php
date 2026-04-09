@@ -6,38 +6,12 @@
  * sudo /etc/init.d/symcon restart
  *
  * ToDo:
- * - Boolean zurückgeben, wenn KSZT_SendKNXTimeAndDate(30864); über Script ausgelöst False wenn exception
- * - NTP Zeit als Option anstatt Systemzeit verwenden. (Fallback jed. immer Systemzeit)
+ * - 
+ * - 
+ * - 
+ * - 
 */
 
-
-
-/**
- * KNXSystemZeitgeber
- * 
- * Symcon-Modul zur automatischen Übertragung von Zeit- und Datumswerten an KNX-Gruppenadressen.
- * Unterstützt eine Liste von Sendezeiten, die zyklisch abgearbeitet werden.
- * 
- * Eigenschaften:
- * - SendTimes (string): JSON-codierte Liste der Zeiten (Stunde, Minute, optional Sekunde)
- * - GA_Time (string): Gruppenadresse für die Zeit (DPT 10.001)
- * - GA_Date (string): Gruppenadresse für das Datum (DPT 11.001)
- * - Active (bool): Modul aktiv/inaktiv (Timer & Senden)
- * 
- * Timer:
- * - SendKNXTimeTimer: steuert den zyklischen Versand der Zeit- und Datumswerte
- * 
- * Funktionen:
- * - Create(): Initialisiert die Instanz, registriert Properties und Timer, verbindet KNX-Parent
- * - ApplyChanges(): Wird nach Änderungen aufgerufen, aktualisiert den nächsten Timer
- * - RequestAction($Ident, $Value): Platzhalter für Aktions-Handler
- * - SendKNXTimeAndDate(): Sendet aktuelle Zeit und Datum an KNX und setzt nächsten Timer
- * - EncodeDPT10_Time($hour, $minute, $second): Kodiert Zeit in DPT 10.001 Format
- * - EncodeDPT11_Date($day, $month, $year): Kodiert Datum in DPT 11.001 Format
- * - SetNextTimerExecution(): Berechnet und setzt den nächsten Timerintervall
- * - ReceiveData($JSONString): Nicht benötigt, Platzhalter
- * - GetConfigurationForm(): Liefert das JSON-Konfigurationsformular für die Instanz
- */
 declare(strict_types=1);
 class KNXSystemZeitgeber extends IPSModuleStrict
 {
@@ -61,11 +35,18 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 		$this->RegisterPropertyString('SendTimes', '[]');
 		$this->RegisterPropertyString('GA_Time', '');
 		$this->RegisterPropertyString('GA_Date', '');
+		$this->RegisterPropertyString('GA_DateTime', '');
+		$this->RegisterPropertyInteger('SendFormat', 0); // 0 = DPT 10.001 + 11.001, 1 = DPT 19.001
 		$this->RegisterPropertyBoolean('Active', true); // Timer/Sendungen aktiv oder nicht
+		$this->RegisterPropertyBoolean('EnableSendLog', true); // Logeinträge für gesendete Zeit/Datum
 
 		// Intervallmodus
 		$this->RegisterPropertyBoolean('UseInterval', false); // regelmäßigen Aufruf zusätzlich aktivieren
 		$this->RegisterPropertyInteger('IntervalMinutes', 60); // Intervall in Minuten
+
+		// Zeitquelle
+		$this->RegisterPropertyInteger('TimeSource', 0); // 0 = Systemzeit, 1 = NTP-Modul
+		$this->RegisterPropertyInteger('NTPTimeModuleID', 0); // Instanz-ID des NTPZeit-Moduls
 
 		// Attribut zur Vermeidung doppelter Ausführung bei gleichzeitigem Timer-Trigger
 		$this->RegisterAttributeInteger('LastSendTimestamp', 0);
@@ -154,68 +135,123 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 		}
 		$this->WriteAttributeInteger('LastSendTimestamp', $nowTs);
 
+		$date = $this->GetCurrentDateTime();
+		$sendFormat = $this->ReadPropertyInteger('SendFormat');
 		$gaTime = $this->ReadPropertyString('GA_Time');
 		$gaDate = $this->ReadPropertyString('GA_Date');
+		$gaDateTime = $this->ReadPropertyString('GA_DateTime');
 		
-		// --- Zeit senden ---
-		if (!empty($gaTime)) {
-			$parts = explode('/', $gaTime);
-			if (count($parts) === 3) {
-				$date = new DateTimeImmutable();
-				$hours = (int) $date->format('H');
-				$minutes = (int) $date->format('i');
-				$seconds = (int) $date->format('s');
-
-				// chr(0x80) ist der Write-Befehl
-				$knx_time_payload = chr(0x80) . $this->EncodeDPT10_Time($hours, $minutes, $seconds);
-				$this->SendDebug("KNXsystime", "HexWert Time: " . bin2hex($knx_time_payload), 0);
-				
-				$json = json_encode(
-					[
-						"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
-						"GroupAddress1" => (int) $parts[0],
-						"GroupAddress2" => (int) $parts[1],
-						"GroupAddress3" => (int) $parts[2],
-						"Data" => bin2hex($knx_time_payload)
-					]
-				);
-				$result = $this->SendDataToParent($json);
-				$this->LogMessage("Zeit auf den Bus gesetzt: " . $date->format('H:i:s'), KL_NOTIFY);
+		// --- DPT 19.001: Datum + Zeit kombiniert senden ---
+		if ($sendFormat === 1) {
+			if (!empty($gaDateTime)) {
+				$parts = explode('/', $gaDateTime);
+				if (count($parts) === 3) {
+					$knx_datetime_payload = chr(0x80) . $this->EncodeDPT19_DateTime($date);
+					$this->SendDebug(
+						"KNXsystime",
+						sprintf(
+							"Datum/Zeit DPT19: %s | Hex: %s",
+							$date->format('d.m.Y H:i:s'),
+							bin2hex($knx_datetime_payload)
+						),
+						0
+					);
+					
+					$json = json_encode(
+						[
+							"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
+							"GroupAddress1" => (int) $parts[0],
+							"GroupAddress2" => (int) $parts[1],
+							"GroupAddress3" => (int) $parts[2],
+							"Data" => bin2hex($knx_datetime_payload)
+						]
+					);
+					$result = $this->SendDataToParent($json);
+					if ($this->ReadPropertyBoolean('EnableSendLog')) {
+						$this->LogMessage("Datum/Zeit (DPT 19.001) auf den Bus gesetzt: " . $date->format('d.m.Y H:i:s'), KL_NOTIFY);
+					}
+				}
 			}
-		}
+		} else {
+			// --- Zeit senden ---
+			if (!empty($gaTime)) {
+				$parts = explode('/', $gaTime);
+				if (count($parts) === 3) {
+					$hours = (int) $date->format('H');
+					$minutes = (int) $date->format('i');
+					$seconds = (int) $date->format('s');
 
-		// --- Datum senden ---
-		if (!empty($gaDate)) {
-			$parts = explode('/', $gaDate);
-			if (count($parts) === 3) {
-				$date = new DateTimeImmutable(); // aktuelles Datum/Uhrzeit
-				$day   = (int) $date->format('d');
-				$month = (int) $date->format('m');
-				$year  = (int) $date->format('Y');
+					// chr(0x80) ist der Write-Befehl
+					$knx_time_payload = chr(0x80) . $this->EncodeDPT10_Time($hours, $minutes, $seconds);
+					$this->SendDebug(
+						"KNXsystime",
+						sprintf(
+							"Zeit: %02d:%02d:%02d | Hex: %s",
+							$hours,
+							$minutes,
+							$seconds,
+							bin2hex($knx_time_payload)
+						),
+						0
+					);
+					
+					$json = json_encode(
+						[
+							"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
+							"GroupAddress1" => (int) $parts[0],
+							"GroupAddress2" => (int) $parts[1],
+							"GroupAddress3" => (int) $parts[2],
+							"Data" => bin2hex($knx_time_payload)
+						]
+					);
+					$result = $this->SendDataToParent($json);
+					if ($this->ReadPropertyBoolean('EnableSendLog')) {
+						$this->LogMessage("Zeit auf den Bus gesetzt: " . $date->format('H:i:s'), KL_NOTIFY);
+					}
+				}
+			}
 
-				// chr(0x80) ist der Write-Befehl
-				$knx_date_payload = chr(0x80) . $this->EncodeDPT11_Date($day, $month, $year);
-				$this->SendDebug("KNXsystime", "HexWert  Dat: " . bin2hex($knx_date_payload), 0);
-				
-				$json = json_encode(
-					[
-						"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
-						"GroupAddress1" => (int) $parts[0],
-						"GroupAddress2" => (int) $parts[1],
-						"GroupAddress3" => (int) $parts[2],
-						"Data" => bin2hex($knx_date_payload)
-					]
-				);
-				$result = $this->SendDataToParent($json);
-				$this->LogMessage("Datum auf den Bus gesetzt: " . $date->format('d.m.Y'), KL_NOTIFY);
+			// --- Datum senden ---
+			if (!empty($gaDate)) {
+				$parts = explode('/', $gaDate);
+				if (count($parts) === 3) {
+					$day   = (int) $date->format('d');
+					$month = (int) $date->format('m');
+					$year  = (int) $date->format('Y');
+
+					// chr(0x80) ist der Write-Befehl
+					$knx_date_payload = chr(0x80) . $this->EncodeDPT11_Date($day, $month, $year);
+					$this->SendDebug(
+						"KNXsystime",
+						sprintf(
+							"Datum: %02d.%02d.%04d | Hex: %s",
+							$day,
+							$month,
+							$year,
+							bin2hex($knx_date_payload)
+						),
+						0
+					);
+					
+					$json = json_encode(
+						[
+							"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
+							"GroupAddress1" => (int) $parts[0],
+							"GroupAddress2" => (int) $parts[1],
+							"GroupAddress3" => (int) $parts[2],
+							"Data" => bin2hex($knx_date_payload)
+						]
+					);
+					$result = $this->SendDataToParent($json);
+					if ($this->ReadPropertyBoolean('EnableSendLog')) {
+						$this->LogMessage("Datum auf den Bus gesetzt: " . $date->format('d.m.Y'), KL_NOTIFY);
+					}
+				}
 			}
 		}
 
 		// Feste Sendezeiten als Einmal-Timer immer neu berechnen
 		$this->SetNextTimerExecution();
-
-		// Intervalltimer sicherheitshalber prüfen/aktualisieren
-		//$this->SetIntervalExecution();
 	}
 
 
@@ -311,6 +347,105 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 		// gehört aber nicht zur reinen DPT-Kodierung selbst, sondern zum Übertragungsprotokollrahmen.
 		// Die DPT-Kodierung sind nur die 3 Bytes.
 		return pack('C3', $byte0, $byte1, $byte2);
+	}
+
+
+	/**
+	 * EncodeDPT19_DateTime
+	 * 
+	 * Kodiert Datum und Uhrzeit in das KNX DPT 19.001 Format (8 Bytes).
+	 * 
+	 * Verwendete Logik:
+	 * - Wochentag: aus DateTimeImmutable berechnet (1=Montag ... 7=Sonntag)
+	 * - Sommerzeit (SUTI): wird anhand der Zeitzone/des Datums gesetzt
+	 * - Working Day (WD): alle Tage außer Sonntag = Arbeitstag
+	 * - No Working Day (NWD): 0, da WD-Feld gültig ist
+	 * - Fault: 0
+	 * - Quality of clock (CLQ): 0 = neutral / ohne ext. Sync
+	 * - Clock source (SRC): 0 = neutral
+	 * 
+	 * Byte-Aufbau:
+	 * Byte 0: Year since 1900
+	 * Byte 1: Month (1..12)
+	 * Byte 2: Day of month (Bits 0..4) + Day of week (Bits 5..7)
+	 * Byte 3: Hour (Bits 0..4)
+	 * Byte 4: Minute (Bits 0..5)
+	 * Byte 5: Second (Bits 0..5)
+	 * Byte 6: Fault / WD / NWD / NY / ND / NDoW / NT / SUTI
+	 * Byte 7: CLQ / SRC / reserviert
+	 * 
+	 * Rückgabewert:
+	 * - string : 8-Byte Binärstring passend für KNX DPT 19.001
+	 */
+	protected function EncodeDPT19_DateTime(DateTimeImmutable $date): string
+	{
+		$year  = (int) $date->format('Y');
+		$month = (int) $date->format('n');
+		$day   = (int) $date->format('j');
+		$hour  = (int) $date->format('G');
+		$min   = (int) $date->format('i');
+		$sec   = (int) $date->format('s');
+
+		// ISO-8601: 1 = Montag ... 7 = Sonntag
+		$dayOfWeek = (int) $date->format('N');
+
+		// Werte auf zulässige KNX-Bereiche begrenzen
+		$year  = max(1900, min(2155, $year));
+		$month = max(1, min(12, $month));
+		$day   = max(1, min(31, $day));
+		$hour  = max(0, min(23, $hour));
+		$min   = max(0, min(59, $min));
+		$sec   = max(0, min(59, $sec));
+		$dayOfWeek = max(1, min(7, $dayOfWeek));
+
+		// Jahr als Offset zu 1900
+		$yearSince1900 = $year - 1900;
+
+		// Sommerzeit-Flag (SUTI): 1 = Sommerzeit aktiv, 0 = Normalzeit
+		$isDst = ((int) $date->format('I')) === 1 ? 1 : 0;
+
+		// Working Day:
+		// alle Tage außer Sonntag = Arbeitstag
+		$isWorkingDay = ($dayOfWeek !== 7);
+		$wd  = $isWorkingDay ? 1 : 0; // 1 = Working day, 0 = No working day
+		$nwd = 0;                     // WD-Feld ist gültig
+
+		// Gültigkeits-/Statusbits
+		$fault = 0; // kein Fehler
+		$ny    = 0; // Jahr gültig
+		$nd    = 0; // Datum gültig
+		$ndow  = 0; // Wochentag gültig
+		$nt    = 0; // Zeit gültig
+		$suti  = $isDst;
+
+		// Quality / Source neutral
+		$clq = 0; // clock without ext. sync signal
+		$src = 0; // source neutral
+
+		// Bytes zusammensetzen
+		$byte0 = $yearSince1900 & 0xFF;
+		$byte1 = $month & 0x0F;
+		$byte2 = (($dayOfWeek & 0x07) << 5) | ($day & 0x1F);
+		$byte3 = $hour & 0x1F;
+		$byte4 = $min & 0x3F;
+		$byte5 = $sec & 0x3F;
+
+		$byte6 =
+			(($fault & 0x01) << 7) |
+			(($wd    & 0x01) << 6) |
+			(($nwd   & 0x01) << 5) |
+			(($ny    & 0x01) << 4) |
+			(($nd    & 0x01) << 3) |
+			(($ndow  & 0x01) << 2) |
+			(($nt    & 0x01) << 1) |
+			($suti   & 0x01);
+
+		$byte7 =
+			(($clq & 0x01) << 7) |
+			(($src & 0x03) << 5);
+			// restliche Bits reserviert = 0
+
+		return pack('C8', $byte0, $byte1, $byte2, $byte3, $byte4, $byte5, $byte6, $byte7);
 	}
 
 
@@ -425,6 +560,8 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 	 */
 	public function GetConfigurationForm(): string
 	{
+		$sendFormat = $this->ReadPropertyInteger('SendFormat');
+
 		$elements = [
 			[
 				"type"    => "CheckBox",
@@ -436,18 +573,81 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 				"caption" => $this->Translate("KNX_CONNECTOR_NOTICE") // neuen Eintrag in local.json anlegen
 			],
 			[
+				"type"    => "Select",
+				"name"    => "SendFormat",
+				"caption" => "Sendeformat",
+				"options" => [
+					[
+						"caption" => "Getrennt: DPT 10.001 + 11.001",
+						"value"   => 0
+					],
+					[
+						"caption" => "Kombiniert: DPT 19.001",
+						"value"   => 1
+					]
+				]
+			],
+			[
+				"type"    => "Label",
+				"caption" => "Bei einer Umstellung des Sendeformats bitte die Konfiguration übernehmen, damit das passende Eingabeformular angezeigt wird."
+			]
+		];
+
+		if ($sendFormat === 1) {
+			$elements[] = [
+				"type"    => "ValidationTextBox",
+				"name"    => "GA_DateTime",
+				"caption" => $this->Translate("GA_DateTime"),
+				"width"   => "300px"
+			];
+		} else {
+			$elements[] = [
 				"type"    => "ValidationTextBox",
 				"name"    => "GA_Time",
 				"caption" => $this->Translate("GA_Time"),
-				"validate"=> "^\\d{1,2}/\\d{1,2}/\\d{1,2}$",
 				"width"   => "300px"
-			],
-			[
+			];
+			$elements[] = [
 				"type"    => "ValidationTextBox",
 				"name"    => "GA_Date",
 				"caption" => $this->Translate("GA_Date"),
-				"validate"=> "^\\d{1,2}/\\d{1,2}/\\d{1,2}$",
 				"width"   => "300px"
+			];
+		}
+
+		$elements = array_merge($elements, [
+			[
+				"type"    => "Select",
+				"name"    => "TimeSource",
+				"caption" => $this->Translate("TimeSource"),
+				"options" => [
+					[
+						"caption" => $this->Translate("TimeSource_System"),
+						"value"   => 0
+					],
+					[
+						"caption" => $this->Translate("TimeSource_NTPModule"),
+						"value"   => 1
+					]
+				]
+			],
+			[
+				"type"     => "SelectInstance",
+				"name"     => "NTPTimeModuleID",
+				"caption"  => $this->Translate("NTPTimeModuleID"),
+				"moduleID" => "{E31ABDB4-5644-58A6-70C4-E8C97A4895E1}"
+			],
+			[
+				"type"    => "Label",
+				"caption" => $this->Translate("NTP_FALLBACK_NOTICE")
+			],
+			[
+				'type'    => 'Label',
+				'caption' => $this->Translate('AccuracyNotice')
+			],
+			[
+				'type'    => 'Label',
+				'caption' => '---------------------------------------------'
 			],
 			[
 				"type"    => "Label",
@@ -479,8 +679,13 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 				"type"    => "NumberSpinner",
 				"name"    => "IntervalMinutes",
 				"caption" => $this->Translate("IntervalMinutes")
+			],
+			[
+				"type"    => "CheckBox",
+				"name"    => "EnableSendLog",
+				"caption" => $this->Translate("EnableSendLog")
 			]
-		];
+		]);
 		$actions = [
 			[
 				"type"    => "Button",
@@ -537,6 +742,55 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 			"elements" => $elements,
 			"actions"  => $actions
 		]);
+	}
+
+	/**
+	 * GetCurrentDateTime
+	 * 
+	 * Ermittelt die zu verwendende Zeitquelle.
+	 * Verwendet wahlweise die Systemzeit oder ein NTP-Modul.
+	 * Wenn das NTP-Modul nicht installiert ist, keine gültige Instanz konfiguriert ist
+	 * oder keine gültigen Daten liefert, wird automatisch auf die Systemzeit zurückgefallen.
+	 * 
+	 * Rückgabewert:
+	 *  - DateTimeImmutable : Aktuelles Datum/Uhrzeit-Objekt
+	 */
+	private function GetCurrentDateTime(): DateTimeImmutable
+	{
+		$timeSource = $this->ReadPropertyInteger('TimeSource');
+		if ($timeSource !== 1) {
+			$this->SendDebug("KNXsystime", "Zeitquelle: Systemzeit", 0);
+			return new DateTimeImmutable();
+		}
+
+		$ntpInstanceID = $this->ReadPropertyInteger('NTPTimeModuleID');
+		if ($ntpInstanceID <= 0 || !@IPS_ObjectExists($ntpInstanceID)) {
+			$this->LogMessage("NTP-Modul nicht konfiguriert oder Instanz existiert nicht. Fallback auf Systemzeit.", KL_ERROR);
+			$this->SendDebug("KNXsystime", "NTP-Modul ungültig, Fallback auf Systemzeit", 0);
+			return new DateTimeImmutable();
+		}
+
+		try {
+			if (!function_exists('NTPZEIT_GetLiveUnixTime')) {
+				$this->LogMessage("NTP-Modul Funktionen sind nicht verfügbar. Fallback auf Systemzeit.", KL_ERROR);
+				$this->SendDebug("KNXsystime", "NTPZEIT_GetLiveUnixTime nicht verfügbar, Fallback auf Systemzeit", 0);
+				return new DateTimeImmutable();
+			}
+
+			$unixTime = NTPZEIT_GetLiveUnixTime($ntpInstanceID);
+			if (!is_int($unixTime) || $unixTime <= 0) {
+				$this->LogMessage("NTP-Modul liefert keine gültige Zeit. Fallback auf Systemzeit.", KL_ERROR);
+				$this->SendDebug("KNXsystime", "NTP-Modul liefert ungültige Zeit, Fallback auf Systemzeit", 0);
+				return new DateTimeImmutable();
+			}
+
+			$this->SendDebug("KNXsystime", "Zeitquelle: NTP-Modul Instanz " . $ntpInstanceID, 0);
+			return (new DateTimeImmutable())->setTimestamp($unixTime);
+		} catch (Throwable $e) {
+			$this->LogMessage("Fehler beim Lesen der NTP-Zeit. Fallback auf Systemzeit: " . $e->getMessage(), KL_ERROR);
+			$this->SendDebug("KNXsystime", "Exception bei NTP-Zeit, Fallback auf Systemzeit: " . $e->getMessage(), 0);
+			return new DateTimeImmutable();
+		}
 	}
 
 	/**

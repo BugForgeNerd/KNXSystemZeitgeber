@@ -1,0 +1,12 @@
+{
+    "id": "{E31ABDB4-5644-58A6-70C4-E8C97A4895E1}",
+    "name": "NTPZeit",
+    "type": 3,
+    "vendor": "BugForgeNerd",
+    "aliases": [],
+    "parentRequirements": [],
+    "childRequirements": [],
+    "implemented": [],
+    "prefix": "NTPZEIT",
+    "url": "https://github.com/BugForgeNerd/KNXSystemZeitgeber"
+}

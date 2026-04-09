@@ -1,41 +1,56 @@
 {
     "translations": {
         "de": {
+			"EnableSendLog": "Logeinträge für gesendete Zeit und Datum erzeugen",
+			"AccuracyNotice": "Die Zeit wird über einen öffentlichen NTP-Server abgefragt. Die typische Genauigkeit liegt im Bereich von 10–100 ms. Eine Garantie für die Genauigkeit kann nicht übernommen werden. Nicht für sicherheitskritische Anwendungen geeignet.",
             "Active": "Senden & Timer aktiv",
             "KNX_CONNECTOR_NOTICE": "Dieses Modul benötigt eine Verbindung zum KNX Gateway (Splitter Instanz).",
             "GA_Time": "Uhrzeit Gruppenadresse Format 8/0/0 (DPT 10.001)",
             "GA_Date": "Datum Gruppenadresse Format 8/0/0 (DPT 11.001)",
+            "GA_DateTime": "Datum/Zeit Gruppenadresse Format 8/0/0 (DPT 19.001)",
             "SEND_TIMES_NOTICE": "Sendezeiten definieren (z.B. 00:01:00, 12:01:00)",
             "SendTimes": "Liste Sendezeiten",
             "TIME_COLUMN": "Sendezeit (HH:mm:ss)",
             "SendNow": "Zeit/Datum jetzt manuell senden",
             "NoTimes": "Keine gültigen Zeiten. Timer deaktiviert.",
-			"UseInterval": "Regelmäßigen Aufruf zusätzlich aktivieren",
-			"IntervalMinutes": "Alle x Minuten ausführen",
+            "UseInterval": "Regelmäßigen Aufruf zusätzlich aktivieren",
+            "IntervalMinutes": "Alle x Minuten ausführen",
             "LICENSE_NOTICE": "Diese Software steht unter der Apache-2.0-Lizenz und ist sowohl privat als auch kommerziell kostenlos nutzbar. Sie kann von dir genutzt werden, ohne dass Lizenzgebühren anfallen. Jegliche Haftung für Schäden ist ausgeschlossen. Weitere Informationen zum Modul und seiner Funktionsweise finden Sie auf GitHub: https://github.com/BugForgeNerd/KNXSystemZeitgeber",
             "DONATION_HEADER": "Spenden zur Stärkung der OpenSource Entwickler",
             "DONATION_TEXT": "Open Source bietet Kostenersparnis, hohe Sicherheit, Transparenz und Unabhängigkeit von Herstellern. Durch den offenen Quellcode ist Software flexibel anpassbar, interoperabel und profitiert von einer aktiven Community, die Fehler schnell findet und behebt.",
             "DONATION_INFO": "Wenn Sie mich unterstützen möchten, dann geht das ganz einfach und freiwillig unter dem folgenden Link.",
-            "PAYPAL_LINK": "https://www.paypal.com/donate/?hosted_button_id=GPLYXLH6AJYF8"
+            "PAYPAL_LINK": "https://www.paypal.com/donate/?hosted_button_id=GPLYXLH6AJYF8",
+            "TimeSource": "Zeitquelle",
+            "TimeSource_System": "Systemzeit verwenden",
+            "TimeSource_NTPModule": "Zeit aus NTP-Modul verwenden",
+            "NTPTimeModuleID": "NTP-Zeitmodul",
+            "NTP_FALLBACK_NOTICE": "Wenn das NTP-Modul nicht installiert ist, keine gültige Instanz gewählt wurde oder keine Zeit liefert, wird automatisch die Systemzeit verwendet."
         },
         "en": {
+			"EnableSendLog": "Create log entries for sent time and date",
+			"AccuracyNotice": "Time is retrieved from a public NTP server. Typical accuracy is between 10–100 ms. No guarantee for accuracy or availability is provided. Not suitable for safety-critical applications.",
             "Active": "Send & Timer active",
             "KNX_CONNECTOR_NOTICE": "This module requires a connection to the KNX Gateway (Splitter Instanz).",
             "GA_Time": "Time group address format 8/0/0 (DPT 10.001)",
             "GA_Date": "Date group address format 8/0/0 (DPT 11.001)",
+			"GA_DateTime": "Date/Time group address Format 8/0/0 (DPT 19.001)",
             "SEND_TIMES_NOTICE": "Define send times (e.g. 00:01:00, 12:01:00)",
             "SendTimes": "List of send times",
             "TIME_COLUMN": "Send time (HH:mm:ss)",
             "SendNow": "Send time/date manually now",
-			"UseInterval": "Enable periodic execution",
-			"IntervalMinutes": "Execute every x minutes",
+            "UseInterval": "Enable periodic execution",
+            "IntervalMinutes": "Execute every x minutes",
             "NoTimes": "No valid times. Timer disabled.",
             "LICENSE_NOTICE": "This software is licensed under Apache-2.0 and is free for both private and commercial use. You can use it without paying license fees. All liability for damages is excluded. More information about the module and its functionality is available on GitHub: https://github.com/BugForgeNerd/KNXSystemZeitgeber",
             "DONATION_HEADER": "Support Open-Source Developers",
             "DONATION_TEXT": "Open source offers cost savings, high security, transparency, and independence from vendors. Its open code allows flexible customization, interoperability, and benefits from an active community that quickly identifies and fixes bugs.",
             "DONATION_INFO": "If you’d like to support me, you can do so easily and voluntarily via the following link.",
-            "PAYPAL_LINK": "https://www.paypal.com/donate/?hosted_button_id=GPLYXLH6AJYF8"
+            "PAYPAL_LINK": "https://www.paypal.com/donate/?hosted_button_id=GPLYXLH6AJYF8",
+            "TimeSource": "Time source",
+            "TimeSource_System": "Use system time",
+            "TimeSource_NTPModule": "Use time from NTP module",
+            "NTPTimeModuleID": "NTP time module",
+            "NTP_FALLBACK_NOTICE": "If the NTP module is not installed, no valid instance is selected, or it does not provide a valid time, the system time is used automatically."
         }
     }
 }
-
