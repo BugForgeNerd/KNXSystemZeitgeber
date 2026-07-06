@@ -65,8 +65,9 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 	 * 
 	 * Wird aufgerufen, wenn die Modulkonfiguration geändert wurde.
 	 * - Ruft die übergeordnete ApplyChanges-Methode auf
-	 * - Prüft, ob ein kompatibler Parent vorhanden ist
-	 * - Setzt den Instanzstatus entsprechend
+	 * - Setzt den Instanzstatus anhand des Modulschalters 'Active'
+	 * - Prüft den KNX Parent bewusst NICHT beim Start, da dieser beim Symcon-Neustart
+	 *   ggf. noch nicht vollständig initialisiert ist
 	 * - Setzt die Timer für feste Sendezeiten und Intervall neu
 	 * 
 	 * Parameter: keine
@@ -76,12 +77,12 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 	{
 		parent::ApplyChanges();
 
-		// Prüfen ob ein aktiver Parent vorhanden ist
-		if (!$this->HasActiveParent()) {
-			$this->SetStatus(IS_INACTIVE);
-			$this->SendDebug("KNXsystime", "Kein aktiver KNX Parent verbunden", 0);
-		} else {
+		// Der Status im Objektbaum richtet sich hier nur nach dem Modulschalter.
+		// Der KNX Parent wird hier bewusst nicht geprüft.
+		if ($this->ReadPropertyBoolean('Active')) {
 			$this->SetStatus(IS_ACTIVE);
+		} else {
+			$this->SetStatus(IS_INACTIVE);
 		}
 
 		$this->SetNextTimerExecution();
@@ -112,8 +113,12 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 	 * 
 	 * Sendet die aktuelle Uhrzeit und das aktuelle Datum an die in den Eigenschaften
 	 * definierten KNX-Gruppenadressen. Die Funktion prüft, ob das Modul aktiv ist
-	 * (Eigenschaft 'Active') und sendet nur dann. Anschließend werden die Timer für
-	 * feste Sendezeiten und Intervall neu gesetzt bzw. geprüft.
+	 * (Eigenschaft 'Active') und sendet nur dann.
+	 * 
+	 * Die Prüfung auf einen aktiven KNX Parent erfolgt bewusst erst direkt vor der
+	 * tatsächlichen Nutzung der übergeordneten Instanz. Dadurch wird vermieden,
+	 * dass das Modul beim Symcon-Neustart fälschlich dauerhaft als inaktiv angezeigt
+	 * wird, nur weil der KNX Parent zu diesem Zeitpunkt noch nicht fertig initialisiert ist.
 	 * 
 	 * Parameter: keine
 	 * 
@@ -122,15 +127,33 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 	public function SendKNXTimeAndDate(): void
 	{
 		if (!$this->ReadPropertyBoolean('Active')) {
+			$this->SetStatus(IS_INACTIVE);
+			$this->SetNextTimerExecution();
+			$this->SetIntervalExecution();
 			$this->SendDebug("KNXsystime", "Senden übersprungen (Active = false)", 0);
 			return;
 		}
+
+		// Parent erst hier prüfen, also genau dann, wenn er wirklich benötigt wird.
+		if (!$this->HasActiveParent()) {
+			$this->SetStatus(IS_INACTIVE);
+			$this->SendDebug("KNXsystime", "Senden abgebrochen: kein aktiver KNX Parent verbunden", 0);
+
+			// Auch bei fehlendem Parent den nächsten festen Timer neu berechnen.
+			$this->SetNextTimerExecution();
+
+			return;
+		}
+
+		// Wenn der Parent verfügbar ist, einen eventuell alten Inactive-Status zurücksetzen.
+		$this->SetStatus(IS_ACTIVE);
 
 		// Doppelte Ausführung vermeiden, wenn fester Timer und Intervalltimer in derselben Sekunde auslösen
 		$nowTs = time();
 		$lastSendTs = $this->ReadAttributeInteger('LastSendTimestamp');
 		if ($lastSendTs === $nowTs) {
 			$this->SendDebug("KNXsystime", "Doppelte Ausführung in derselben Sekunde unterdrückt", 0);
+			$this->SetNextTimerExecution();
 			return;
 		}
 		$this->WriteAttributeInteger('LastSendTimestamp', $nowTs);
@@ -141,108 +164,72 @@ class KNXSystemZeitgeber extends IPSModuleStrict
 		$gaDate = $this->ReadPropertyString('GA_Date');
 		$gaDateTime = $this->ReadPropertyString('GA_DateTime');
 		
-		// --- DPT 19.001: Datum + Zeit kombiniert senden ---
 		if ($sendFormat === 1) {
 			if (!empty($gaDateTime)) {
 				$parts = explode('/', $gaDateTime);
 				if (count($parts) === 3) {
 					$knx_datetime_payload = chr(0x80) . $this->EncodeDPT19_DateTime($date);
-					$this->SendDebug(
-						"KNXsystime",
-						sprintf(
-							"Datum/Zeit DPT19: %s | Hex: %s",
-							$date->format('d.m.Y H:i:s'),
-							bin2hex($knx_datetime_payload)
-						),
-						0
-					);
-					
-					$json = json_encode(
-						[
-							"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
-							"GroupAddress1" => (int) $parts[0],
-							"GroupAddress2" => (int) $parts[1],
-							"GroupAddress3" => (int) $parts[2],
-							"Data" => bin2hex($knx_datetime_payload)
-						]
-					);
-					$result = $this->SendDataToParent($json);
+
+					$json = json_encode([
+						"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
+						"GroupAddress1" => (int) $parts[0],
+						"GroupAddress2" => (int) $parts[1],
+						"GroupAddress3" => (int) $parts[2],
+						"Data" => bin2hex($knx_datetime_payload)
+					]);
+
+					$this->SendDataToParent($json);
+
 					if ($this->ReadPropertyBoolean('EnableSendLog')) {
 						$this->LogMessage("Datum/Zeit (DPT 19.001) auf den Bus gesetzt: " . $date->format('d.m.Y H:i:s'), KL_NOTIFY);
 					}
 				}
 			}
 		} else {
-			// --- Zeit senden ---
 			if (!empty($gaTime)) {
 				$parts = explode('/', $gaTime);
 				if (count($parts) === 3) {
-					$hours = (int) $date->format('H');
-					$minutes = (int) $date->format('i');
-					$seconds = (int) $date->format('s');
+					$knx_time_payload = chr(0x80) . $this->EncodeDPT10_Time(
+						(int) $date->format('H'),
+						(int) $date->format('i'),
+						(int) $date->format('s')
+					);
 
-					// chr(0x80) ist der Write-Befehl
-					$knx_time_payload = chr(0x80) . $this->EncodeDPT10_Time($hours, $minutes, $seconds);
-					$this->SendDebug(
-						"KNXsystime",
-						sprintf(
-							"Zeit: %02d:%02d:%02d | Hex: %s",
-							$hours,
-							$minutes,
-							$seconds,
-							bin2hex($knx_time_payload)
-						),
-						0
-					);
-					
-					$json = json_encode(
-						[
-							"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
-							"GroupAddress1" => (int) $parts[0],
-							"GroupAddress2" => (int) $parts[1],
-							"GroupAddress3" => (int) $parts[2],
-							"Data" => bin2hex($knx_time_payload)
-						]
-					);
-					$result = $this->SendDataToParent($json);
+					$json = json_encode([
+						"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
+						"GroupAddress1" => (int) $parts[0],
+						"GroupAddress2" => (int) $parts[1],
+						"GroupAddress3" => (int) $parts[2],
+						"Data" => bin2hex($knx_time_payload)
+					]);
+
+					$this->SendDataToParent($json);
+
 					if ($this->ReadPropertyBoolean('EnableSendLog')) {
 						$this->LogMessage("Zeit auf den Bus gesetzt: " . $date->format('H:i:s'), KL_NOTIFY);
 					}
 				}
 			}
 
-			// --- Datum senden ---
 			if (!empty($gaDate)) {
 				$parts = explode('/', $gaDate);
 				if (count($parts) === 3) {
-					$day   = (int) $date->format('d');
-					$month = (int) $date->format('m');
-					$year  = (int) $date->format('Y');
+					$knx_date_payload = chr(0x80) . $this->EncodeDPT11_Date(
+						(int) $date->format('d'),
+						(int) $date->format('m'),
+						(int) $date->format('Y')
+					);
 
-					// chr(0x80) ist der Write-Befehl
-					$knx_date_payload = chr(0x80) . $this->EncodeDPT11_Date($day, $month, $year);
-					$this->SendDebug(
-						"KNXsystime",
-						sprintf(
-							"Datum: %02d.%02d.%04d | Hex: %s",
-							$day,
-							$month,
-							$year,
-							bin2hex($knx_date_payload)
-						),
-						0
-					);
-					
-					$json = json_encode(
-						[
-							"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
-							"GroupAddress1" => (int) $parts[0],
-							"GroupAddress2" => (int) $parts[1],
-							"GroupAddress3" => (int) $parts[2],
-							"Data" => bin2hex($knx_date_payload)
-						]
-					);
-					$result = $this->SendDataToParent($json);
+					$json = json_encode([
+						"DataID" => "{42DFD4E4-5831-4A27-91B9-6FF1B2960260}",
+						"GroupAddress1" => (int) $parts[0],
+						"GroupAddress2" => (int) $parts[1],
+						"GroupAddress3" => (int) $parts[2],
+						"Data" => bin2hex($knx_date_payload)
+					]);
+
+					$this->SendDataToParent($json);
+
 					if ($this->ReadPropertyBoolean('EnableSendLog')) {
 						$this->LogMessage("Datum auf den Bus gesetzt: " . $date->format('d.m.Y'), KL_NOTIFY);
 					}
